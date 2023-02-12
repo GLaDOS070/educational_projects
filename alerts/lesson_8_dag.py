@@ -8,8 +8,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import io
 
-my_token = '5831544767:AAE-9VA_reObxmIb_FDZYeh9N4TiCslx-yc' 
+# вставить токен для бота
+my_token = 'my_token' 
 
+# устанавливаем connection
 connection = {'host': 'https://clickhouse.lab.karpov.courses',
                       'database':'simulator_20221120',
                       'user':'USER', 
@@ -32,16 +34,32 @@ def lesson_8_dag_merinov():
 
     @task()
     def run_alerts(chat=None):
+
+        """
+        функция детектирует аномалии в данных, при обнаружении анаомалии составляет отчет и график, которые отправляет сообщением в чат в телеграм
+            chat: str,
+                id чата в телеграм
+        """
         
-        my_token = 'MY_TOKEN' 
+        my_token = 'my_token' 
         chat_id = 'MY_CHAT_ID' 
         bot = telegram.Bot(token=my_token)
         
         
         def check_anomaly(df, metric, a=4, n=5):
+
             """
-            функция check_anomaly предлагает алгоритм проверки значения на аномальность посредством
+            функция предлагает алгоритм проверки значения на аномальность посредством
+                df: pandas.DataFrame
+                    датафрейм для проведения поиска аномалий
+                metric: str
+                    метрика, по которой ищем аномалии
+                a: int
+                    коэффициент межквартильного размаха
+                n: int
+                    размер окна для скользящей средней
             """
+
             df['q25'] = df[metric].shift(1).rolling(n).quantile(0.25)
             df['q75'] = df[metric].shift(1).rolling(n).quantile(0.75)
             df['iqr'] = df['q75'] - df['q25']

@@ -8,21 +8,25 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import io
 
+# устанавливаем connection
 connection = {'host': 'https://clickhouse.lab.karpov.courses',
                       'database':'simulator_20221120',
                       'user':'USER', 
                       'password':'PASSWORD'
                      }
 
+# выбираем необходимую тему для графиков
 from matplotlib import style
 sns.set_theme(({**style.library["fivethirtyeight"]}))
 plt.rcParams["figure.figsize"] = (15,8)
 
 
-my_token = '5831544767:AAE-9VA_reObxmIb_FDZYeh9N4TiCslx-yc' 
+# вставить токен для бота
+my_token = 'my_token' 
 bot = telegram.Bot(token=my_token) 
 
-chat_id = -817095409
+# вставить чат id
+chat_id = 'chat_id'
 
 default_args = {
     'owner': 'd-merinov-24',
@@ -39,6 +43,11 @@ def lesson_7_dag_2_merinov():
 
     @task()
     def get_dau_df_2():
+
+        """
+        функция вовзвращает датафрейм с данными по DAU
+        """
+
         query = '''
                     SELECT COUNT (DISTINCT user_id ) as uniq_users,
                     day, os, gender, age, source 
@@ -66,6 +75,13 @@ def lesson_7_dag_2_merinov():
 
     @task()
     def get_dau_info(dau_df):
+
+        """
+        функция вовзвращает текстовый отчет по пользовательским метрикам в приложении
+            dau_df: pandas.DataFrame
+                датафрейм с данными по пользователя
+        """
+
         dau = dau_df.groupby('day', as_index=False).agg({'uniq_users':'sum'})
         dau['growth_rate'] = dau.uniq_users.pct_change()
 
@@ -114,6 +130,11 @@ def lesson_7_dag_2_merinov():
 
     @task()
     def get_df_new_users():
+
+        """
+        функция вовзвращает датафрейм с данными по новым пользователям
+        """
+
         query = '''with mess as (Select    user_id,
                                min(toDate(time)) as bd,
                            os, gender, age, source
@@ -143,6 +164,12 @@ def lesson_7_dag_2_merinov():
     
     @task()
     def get_info_new_users(df_new_users):
+
+        """
+        функция вовзвращает текстовый отчет по метрикам в приложении о новых пользователях
+            df_new_users: pandas.DataFrame
+                датафрейм с данными по новым пользователям
+        """
 
         new_users = df_new_users.groupby('bd', as_index=False).agg({'users':'sum'})
         new_users['growth_rate'] = new_users.users.pct_change()
@@ -200,6 +227,10 @@ def lesson_7_dag_2_merinov():
     
     @task()
     def get_likes_views_df():
+            
+            """
+            функция вовзвращает датафрейм с данными по лайкам и просмотрам
+            """
             query = '''SELECT toStartOfDay(toDateTime(time)) AS day,
                            count(user_id) as actions,
                            action 
@@ -214,6 +245,11 @@ def lesson_7_dag_2_merinov():
 
     @task()
     def get_messages_df():
+            
+            """
+            функция вовзвращает датафрейм с данными по сообщениям
+            """
+
             query = '''SELECT toStartOfDay(toDateTime(time)) AS day,
                            count(user_id) as messages
                     FROM simulator_20221120.message_actions
@@ -227,6 +263,13 @@ def lesson_7_dag_2_merinov():
     @task()
     def get_info_likes_views_mess(likes_views_df, messages_df):
 
+        """
+        функция вовзвращает текстовый отчет по метрикам в приложении о лайках, просмотрах и сообщениях
+            likes_views_df: pandas.DataFrame
+                датафрейм с данными по лайкам и просмотрам
+            messages_df: pandas.DataFrame
+                датафрейм с данными по сообщениям
+        """
 
         actions_df = likes_views_df.groupby(['day', 'action'], as_index=False)\
                     .agg({'actions':'sum'})\
@@ -257,6 +300,13 @@ def lesson_7_dag_2_merinov():
     
     @task()
     def send_plot_dau_df(dau_df):
+
+        """
+        функция отпраляет графики на основании данных о DAU
+            dau_df: pandas.DataFrame
+                датафрейм с данными по пользователям
+        """
+
         dau_df.day = pd.to_datetime(dau_df["day"])
         dau_df = dau_df.sort_values('day')
         dau_df.day = dau_df.day.dt.strftime('%d-%m')
@@ -280,6 +330,13 @@ def lesson_7_dag_2_merinov():
         
     @task()
     def send_plot_new_users_df(df_new_users):
+
+        """
+        функция отпраляет графики на основании данных о новых пользователях
+            df_new_users: pandas.DataFrame
+                датафрейм с данными по новым пользователям
+        """
+        
         df_new_users.bd = pd.to_datetime(df_new_users.bd)
         df_new_users = df_new_users.sort_values('bd').query('bd > "1971-01-01"')
         df_new_users.bd = df_new_users.bd.dt.strftime('%d-%m')
@@ -304,6 +361,15 @@ def lesson_7_dag_2_merinov():
         
     @task()
     def send_plot_likes_views_df(likes_views_df, messages_df):
+
+        """
+        функция отпраляет графики на основании данных о сообщениях, лайках и просмотров
+            likes_views_df: pandas.DataFrame
+                датафрейм с данными по лайкам и просмотрам
+            messages_df: pandas.DataFrame
+                датафрейм с данными по сообщениям
+        """
+
         likes_views_df.day = pd.to_datetime(likes_views_df["day"])
         likes_views_df = likes_views_df.sort_values('day')
         likes_views_df.day = likes_views_df.day.dt.strftime('%d-%m')
@@ -335,14 +401,26 @@ def lesson_7_dag_2_merinov():
         
     @task()
     def send_message(title):
+
+        """
+        функция отправлет сообщение 
+            title: str
+                текст сообщения
+        """
         bot.sendMessage(chat_id=chat_id, text=title, parse_mode='HTML')
         
     @task()
     def send_message_title():
+
+        """
+        функция отправлет заголовок отчета 
+        """
+         
         context = get_current_context()
         ds = context['ds']
         bot.sendMessage(chat_id=chat_id, text=f"📄<b>Ежедневный отчет по ленте новостей, и по сервису отправки сообщений. Дата: {ds}</b>", parse_mode='HTML')
     
+    # определяем последовательность тасков
     send_message_title()
     dau_df = get_dau_df_2()
     title_1 = get_dau_info(dau_df)
@@ -358,4 +436,5 @@ def lesson_7_dag_2_merinov():
     send_message(title_3)
     send_plot_likes_views_df(likes_views_df, messages_df)
     
+ # запускаем dag   
 lesson_7_dag_2_merinov = lesson_7_dag_2_merinov()
