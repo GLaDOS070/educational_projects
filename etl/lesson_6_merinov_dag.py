@@ -4,11 +4,13 @@ from airflow.decorators import dag, task
 import pandas as pd
 import pandahouse as ph
 
+# устанавливаем connection
 connection = {'host': 'https://clickhouse.lab.karpov.courses',
                       'database':'simulator_20221120',
                       'user':'USER', 
                       'password':'PASSWORD'
                      }
+# устанавливаем test connection
 connection_test = {'host': 'https://clickhouse.lab.karpov.courses',
                       'database':'test',
                       'user':'USER_TEST', 
@@ -29,6 +31,11 @@ def lesson_6_etl_merinov():
     
     @task()
     def get_feed():
+
+        """
+        функция вовзвращает датафрейм с данными по ленте
+        """
+
         query = '''
                     SELECT user_id as users,
                            toDate(time) as event_date,
@@ -43,34 +50,48 @@ def lesson_6_etl_merinov():
         return df_feed
     @task()
     def get_messages():
-            query = '''
-                        with table1 as 
-                            (SELECT user_id as users,
-                                   toDate(time) as event_date,
-                                   count(1) as messages_sent,
-                                   count(DISTINCT reciever_id) as users_received,
-                                   os, gender, age
-                            FROM simulator_20221120.message_actions
-                            WHERE toDate(time) = today() - 1
-                            GROUP BY users, os, gender, age, event_date
-                            )
 
-                        SELECT l.*, messages_received, users_sent FROM table1 as l
-                        LEFT JOIN 
-                          (
-                              SELECT reciever_id as users,
-                                     toDate(time) as event_date,
-                                     count(1) as messages_received, 
-                                     count(DISTINCT user_id) as users_sent
-                              FROM simulator_20221120.message_actions 
-                              WHERE toDate(time) = today() - 1
-                              GROUP BY users, event_date
-                          ) as r ON l.users = r.users and l.event_date = r.event_date
+        """
+        функция вовзвращает датафрейм с данными по сообщениям
+        """
+
+        query = '''
+                    with table1 as 
+                        (SELECT user_id as users,
+                                toDate(time) as event_date,
+                                count(1) as messages_sent,
+                                count(DISTINCT reciever_id) as users_received,
+                                os, gender, age
+                        FROM simulator_20221120.message_actions
+                        WHERE toDate(time) = today() - 1
+                        GROUP BY users, os, gender, age, event_date
+                        )
+
+                    SELECT l.*, messages_received, users_sent FROM table1 as l
+                    LEFT JOIN 
+                        (
+                            SELECT reciever_id as users,
+                                toDate(time) as event_date,
+                                count(1) as messages_received, 
+                                count(DISTINCT user_id) as users_sent
+                            FROM simulator_20221120.message_actions 
+                            WHERE toDate(time) = today() - 1
+                            GROUP BY users, event_date
+                        ) as r ON l.users = r.users and l.event_date = r.event_date
                 '''
-            df_mess = ph.read_clickhouse(query=query, connection=connection)
-            return df_mess
+        df_mess = ph.read_clickhouse(query=query, connection=connection)
+        return df_mess
     @task()
     def merge_df(df_feed, df_mess):
+
+        """
+        функция вовзвращает объединенный датафрейм по ленте и сообщениям
+            df_feed: pandas.DataFrame
+                датафрейм с данными по ленте
+            df_mess: pandas.DataFrame
+                датафрейм с данными по сообщениям
+        """
+
         df_all = df_feed.merge(df_mess,
                                    left_on=['users', 'event_date', 'os', 'gender', 'age'],
                                    right_on=['users', 'event_date', 'os', 'gender', 'age'],
@@ -78,6 +99,13 @@ def lesson_6_etl_merinov():
         return df_all
     @task()
     def get_df_gender(df_all):
+
+        """
+        функция вовзвращает датафрейм c данными по полу
+            df_all: pandas.DataFrame
+                объединенный датафрейм по ленте и сообщениям
+        """
+
         df_gender = df_all[['gender', 'event_date', 'messages_sent', 'users_received',
                                       'messages_received', 'users_sent', 'views', 'likes']].groupby(['gender','event_date'])\
                                                             .sum().reset_index()\
@@ -87,6 +115,13 @@ def lesson_6_etl_merinov():
 
     @task()
     def get_df_age(df_all):
+
+        """
+        функция вовзвращает датафрейм c данными по возрасту
+            df_all: pandas.DataFrame
+                объединенный датафрейм по ленте и сообщениям
+        """
+
         df_age = df_all[['age', 'event_date', 'messages_sent', 'users_received',
                                       'messages_received', 'users_sent', 'views', 'likes']].groupby(['age','event_date'])\
                                                             .sum().reset_index()\
@@ -96,6 +131,13 @@ def lesson_6_etl_merinov():
 
     @task()
     def get_df_os(df_all):
+
+        """
+        функция вовзвращает датафрейм c данными по операционной системе
+            df_all: pandas.DataFrame
+                объединенный датафрейм по ленте и сообщениям
+        """
+
         df_os = df_all[['os', 'event_date', 'messages_sent', 'users_received',
                                       'messages_received', 'users_sent', 'views', 'likes']].groupby(['os', 'event_date'])\
                                                             .sum().reset_index()\
@@ -104,6 +146,17 @@ def lesson_6_etl_merinov():
         return df_os
     @task()
     def get_final_df(df_gender, df_age, df_os):
+
+        """
+        функция вовзвращает объединенный датафрейм с данными по полу, возрасту и операционной системе
+            df_gender: pandas.DataFrame
+                датафрейм с данными по полу
+            df_age: pandas.DataFrame
+                датафрейм с данными по возрасту
+            df_os: pandas.DataFrame
+                датафрейм с данными по операционной системе
+        """
+
         df_final = pd.concat([df_gender, df_age, df_os], axis=0).reset_index()
 
         df_final.drop(['index'], axis = 1, inplace = True)
@@ -127,6 +180,11 @@ def lesson_6_etl_merinov():
     
     @task
     def load(df_final):
+
+        """
+        функция загружает данные в базу данных
+        """
+
         create = '''CREATE TABLE IF NOT EXISTS test.d_merinov_24
         (event_date Date,
          demension String,
@@ -143,6 +201,7 @@ def lesson_6_etl_merinov():
         ph.execute(query=create, connection=connection_test)
         ph.to_clickhouse(df=df_final, table='d_merinov_24', connection=connection_test, index=False)
 
+    # определяем последовательность тасков
     mess = get_messages()
     feed = get_feed()
     df_all = merge_df(mess, feed)
@@ -152,4 +211,5 @@ def lesson_6_etl_merinov():
     df_final = get_final_df(df_gender, df_age, df_os)
     load(df_final)
     
+# запускаем dag  
 lesson_6_etl_merinov = lesson_6_etl_merinov()

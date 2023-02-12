@@ -7,21 +7,24 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import io
 
+# устанавливаем connection
 connection = {'host': 'https://clickhouse.lab.karpov.courses',
                       'database':'simulator_20221120',
                       'user':'USER', 
                       'password':'PASSWORD'
                      }
 
+# выбираем необходимую тему для графиков
 from matplotlib import style
 sns.set_theme(({**style.library["fivethirtyeight"]}))
 plt.rcParams["figure.figsize"] = (15,8)
 
-
-my_token = '5831544767:AAE-9VA_reObxmIb_FDZYeh9N4TiCslx-yc' 
+# вставить токен для бота
+my_token = 'my_token' 
 bot = telegram.Bot(token=my_token) 
 
-chat_id = -817095409
+# вставить чат id
+chat_id = 'chat_id'
 
 
 default_args = {
@@ -39,6 +42,11 @@ def lesson_7_dag_1_merinov():
 
     @task()
     def get_dau_df():
+
+        """
+        функция вовзвращает датафрейм с данными по DAU
+        """
+
         query = '''SELECT toStartOfDay(toDateTime(time)) AS  day,
                        count(DISTINCT user_id) AS uniq_users
                 FROM simulator_20221120.feed_actions
@@ -51,6 +59,11 @@ def lesson_7_dag_1_merinov():
     
     @task()
     def get_likes_views_df():
+
+        """
+        функция вовзвращает датафрейм с данными по лайкам и просмотрам
+        """
+         
         query = '''SELECT toStartOfDay(toDateTime(time)) AS day,
                        countIf(user_id, action='like') AS likes,
                        countIf(user_id, action='view') AS views
@@ -58,12 +71,18 @@ def lesson_7_dag_1_merinov():
                 WHERE day > (today()-1) - 7 and day != today()
                 GROUP BY toStartOfDay(toDateTime(time))
                 ORDER BY day DESC'''
+
         likes_views_df = ph.read_clickhouse(query=query, connection=connection)
         likes_views_df.day = likes_views_df.day.dt.date
         return likes_views_df
     
     @task()
     def get_ctr_df():
+
+        """
+        функция вовзвращает ctr по лайкам и просмотрам
+        """
+         
         query = '''SELECT toStartOfDay(toDateTime(time)) AS day,
                         CountIf(user_id, action = 'like') / CountIf(user_id, action = 'view') AS ctr
                     FROM simulator_20221120.feed_actions
@@ -77,6 +96,16 @@ def lesson_7_dag_1_merinov():
 
     @task()
     def send_text_info(dau_df, likes_views_df, ctr_df):
+        
+        """
+        функция отправляет сообщение с текстом отчета
+            dau_df: pandas.DataFrame
+                датафрейм с данными по пользователям
+            likes_views_df: pandas.DataFrame
+                датафрейм с данными по лайкам и просмотрам
+            ctr_df: pandas.DataFrame
+                датафрейм с данными по CTR
+        """
 
         msg_general = f'📋ЕЖЕДНЕВНЫЙ ОТЧЕТ о ключевых метриках приложения на {dau_df.loc[0][0]}'
         bot.sendMessage(chat_id=chat_id, text=msg_general)
@@ -86,6 +115,16 @@ def lesson_7_dag_1_merinov():
 
     @task()
     def send_all_plots(dau_df, likes_views_df, ctr_df):
+
+        """
+        функция отправляет сообщение с графиками по метрикам
+            dau_df: pandas.DataFrame
+                датафрейм с данными по пользователям
+            likes_views_df: pandas.DataFrame
+                датафрейм с данными по лайкам и просмотрам
+            ctr_df: pandas.DataFrame
+                датафрейм с данными по CTR
+        """
 
         sns.lineplot(x=dau_df.day, y=dau_df.uniq_users)
         plt.title("DAU in last 7 days")
@@ -125,11 +164,13 @@ def lesson_7_dag_1_merinov():
                       telegram.InputMediaPhoto(plot_object4)]
         bot.send_media_group(chat_id = chat_id, media = media_group)
     
+
+    # определяем последовательность тасков
     dau_df = get_dau_df()
     likes_views_df = get_likes_views_df()
     ctr_df = get_ctr_df()
     send_text_info(dau_df, likes_views_df, ctr_df)
     send_all_plots(dau_df, likes_views_df, ctr_df)
 
-
+# запускаем dag
 lesson_7_dag_1_merinov = lesson_7_dag_1_merinov()
