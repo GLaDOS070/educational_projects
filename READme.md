@@ -10,4 +10,5 @@
 ## [**Построенеие ETL- пайплайна**](https://github.com/GLaDOS070/educational_projects/tree/main/etl)
 - [Обработка 2 таблиц по ленте и сообщениям с созданием новой таблицы с метриками по полу, возрасту и операционной системе](https://github.com/GLaDOS070/educational_projects/blob/main/etl/lesson_6_merinov_dag.py)
 
-## Финальный проект курса "Аналитик данных"
+##  [**Финальный проект курса "Аналитик данных"**](https://github.com/GLaDOS070/educational_projects/tree/main/final_project)
+- [Финальный проект, в котором необходимо было посчитать retention, оценить результаты A/B теста, а также дать рекомендации по использованию метрик для оценки ивента в игре](https://github.com/GLaDOS070/educational_projects/blob/main/final_project/Final_project_var_1.ipynb)
